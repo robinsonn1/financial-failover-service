@@ -1,97 +1,128 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Twilio Failover Dashboard</title>
+    <title>Twilio Failover Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .json-pre { background: #1e293b; color: #38bdf8; padding: 10px; border-radius: 5px; font-size: 0.75rem; overflow-x: auto; }
+        .json-pre { background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 8px; font-size: 11px; overflow-x: auto; font-family: 'Monaco', monospace; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-slate-900 text-white font-sans p-8 flex flex-col min-h-screen">
+<body class="bg-slate-900 text-slate-200 font-sans p-8 flex flex-col min-h-screen">
     <div class="max-w-6xl mx-auto flex-grow w-full">
-        <header class="mb-10 border-b border-slate-700 pb-4 flex justify-between items-end">
-            <h1 class="text-3xl font-bold text-red-500">Twilio <span class="text-white text-xl font-light underline decoration-red-500">Failover Engine</span></h1>
-            <div id="connection-status" class="text-xs text-slate-400">Live Connection: Active</div>
+        <header class="mb-10 border-b border-slate-700 pb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-red-500 italic tracking-tighter">Twilio <span class="text-white not-italic underline decoration-red-500 underline-offset-8">Failover Engine</span></h1>
+                <p id="live-clock" class="text-[10px] text-slate-400 mt-2 uppercase tracking-[0.2em] font-mono italic"></p>
+            </div>
+            <button onclick="toggleAddContact()" class="bg-slate-800 border border-slate-600 px-4 py-2 rounded-full text-[11px] font-bold hover:bg-slate-700 transition-all uppercase tracking-widest">+ Sync Contact to HubSpot</button>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-xl">
-                <h2 class="text-xl font-semibold mb-4 flex items-center italic text-slate-300">Live Webhook Monitor</h2>
-                <div id="log-container" class="space-y-3 h-[500px] overflow-y-auto pr-2">
-                    <p class="text-slate-500">Waiting for triggers...</p>
+        <div id="contact-modal" class="hidden mb-8 bg-slate-800/50 border border-red-500/20 p-6 rounded-xl backdrop-blur-sm shadow-2xl">
+            <h3 class="text-sm font-black mb-4 uppercase text-slate-400 italic">HubSpot CRM Integration</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" id="new-phone" placeholder="Phone (+1...)" class="bg-slate-900 border border-slate-700 p-3 rounded-lg text-sm focus:border-red-500 outline-none">
+                <input type="text" id="new-name" placeholder="First Name" class="bg-slate-900 border border-slate-700 p-3 rounded-lg text-sm focus:border-red-500 outline-none">
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="saveContact()" class="bg-red-600 px-6 py-2 rounded-lg text-xs font-black uppercase shadow-lg shadow-red-900/20">Add Record</button>
+                <button onclick="toggleAddContact()" class="text-slate-500 text-xs px-4">Cancel</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div class="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/50 h-[600px] flex flex-col shadow-inner">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xs font-black text-slate-500 uppercase tracking-widest italic">Live Event Stream</h2>
+                    <span class="animate-pulse w-2 h-2 bg-green-500 rounded-full"></span>
+                </div>
+                <div id="log-container" class="space-y-3 overflow-y-auto pr-3 flex-grow">
+                    <p class="text-center text-slate-600 text-xs mt-10 italic">Awaiting triggers...</p>
                 </div>
             </div>
 
             <div class="space-y-6">
-                <div class="bg-white text-slate-900 p-6 rounded-lg shadow-xl">
-                    <h2 class="text-xl font-bold mb-4">Trigger Alert</h2>
-                    <form id="triggerForm" class="space-y-4">
-                        <input type="text" id="phone" placeholder="Member Phone (+1...)" class="w-full p-2 border rounded">
-                        <textarea id="message" class="w-full p-2 border rounded h-20">Fraud Alert: Large transaction detected.</textarea>
-                        <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700 transition uppercase tracking-wider">Initiate Workflow</button>
-                    </form>
+                <div class="bg-white text-slate-900 p-8 rounded-2xl shadow-2xl border-t-4 border-red-600">
+                    <h2 class="text-2xl font-black mb-6 tracking-tight">Financial Alert Trigger</h2>
+                    <div class="space-y-4">
+                        <input type="text" id="target-phone" placeholder="Member Phone Number" class="w-full p-4 border-2 border-slate-100 rounded-xl focus:border-red-500 outline-none transition-all">
+                        <textarea id="alert-msg" class="w-full p-4 border-2 border-slate-100 rounded-xl h-24 focus:border-red-500 outline-none font-mono text-sm">Urgent: Unauthorized attempt detected on your checking account.</textarea>
+                        <button onclick="startWorkflow()" class="w-full bg-slate-900 text-white font-black py-4 rounded-xl hover:bg-red-600 transition-all shadow-xl shadow-slate-900/20 uppercase tracking-widest">Execute Workflow</button>
+                    </div>
                 </div>
 
-                <div id="detail-panel" class="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-xl hidden">
-                    <h3 class="text-red-400 font-bold mb-2 uppercase text-xs tracking-widest">Payload Inspection</h3>
-                    <div id="json-content"></div>
-                    <div class="mt-4 p-3 bg-slate-900 rounded border border-slate-700">
-                        <p class="text-xs text-slate-500 uppercase font-bold">Message Content</p>
-                        <p id="msg-body-view" class="text-sm text-slate-300 italic"></p>
+                <div id="detail-panel" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-red-400 font-bold uppercase text-[10px] tracking-widest">JSON Inspector</h3>
+                        <span class="text-[9px] text-slate-500 font-mono" id="json-timestamp"></span>
                     </div>
+                    <pre id="json-content" class="json-pre"></pre>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="mt-12 border-t border-slate-800 pt-6 pb-4 text-center text-slate-500 text-sm">
-        <p>Robinson Navarro | Demo 2026 Twilio - All Rights Reserved</p>
+    <footer class="mt-20 border-t border-slate-800 py-10 text-center">
+        <p class="text-slate-600 text-[11px] font-medium tracking-widest uppercase italic">Robinson Navarro | <span id="footer-date"></span> Twilio - All Rights Reserved</p>
     </footer>
 
     <script>
-        let currentLogs = [];
+        let logs = [];
+        
+        // Dynamic Clock Functionality
+        function updateClock() {
+            const now = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' };
+            document.getElementById('live-clock').innerText = now.toLocaleString('en-US', options);
+            document.getElementById('footer-date').innerText = now.getFullYear();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
 
-        async function fetchLogs() {
-            const res = await fetch('/api/logs');
-            const data = await res.json();
-            currentLogs = data;
-            renderLogs();
+        function toggleAddContact() { document.getElementById('contact-modal').classList.toggle('hidden'); }
+        
+        async function saveContact() {
+            const formData = new FormData();
+            formData.append('phone', document.getElementById('new-phone').value);
+            formData.append('first_name', document.getElementById('new-name').value);
+            const res = await fetch('/api/add-contact', { method: 'POST', body: formData });
+            if(res.ok) toggleAddContact();
+            updateLogs();
         }
 
-        function renderLogs() {
+        async function startWorkflow() {
+            const phone = encodeURIComponent(document.getElementById('target-phone').value);
+            const msg = encodeURIComponent(document.getElementById('alert-msg').value);
+            await fetch(`/trigger/Alpha_CU?to_number=${phone}&message=${msg}`, {method: 'POST'});
+            updateLogs();
+        }
+
+        async function updateLogs() {
+            const res = await fetch('/api/logs');
+            logs = await res.json();
             const container = document.getElementById('log-container');
-            container.innerHTML = currentLogs.map((log, index) => `
-                <div onclick="showDetail(${index})" class="p-4 bg-slate-700 hover:bg-slate-600 cursor-pointer rounded border-l-4 transition-all duration-200 ${log.status === 'completed' ? 'border-green-500' : 'border-amber-500'}">
-                    <div class="flex justify-between items-start">
-                        <p class="text-xs text-slate-400 uppercase font-black">${log.event}</p>
-                        ${log.flag ? `<span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-600 text-white">${log.flag}</span>` : ''}
+            if (logs.length === 0) return;
+            
+            container.innerHTML = logs.map((log, i) => `
+                <div onclick="showJSON(${i})" class="p-4 bg-slate-800/80 hover:bg-slate-700 cursor-pointer rounded-xl border border-slate-700 transition-all hover:scale-[1.01]">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[9px] font-black text-slate-500 uppercase italic">${log.timestamp || ''}</span>
+                        <span class="text-[9px] bg-slate-950 px-2 py-0.5 rounded-full border border-slate-700 text-slate-300 font-bold">${log.flag}</span>
                     </div>
-                    <p class="text-sm font-medium mt-1">${log.status || log.details}</p>
-                    <p class="text-[10px] text-slate-500 mt-2 italic text-right">Click to inspect JSON</p>
+                    <p class="text-xs text-slate-300 font-medium">${log.event}: ${log.details}</p>
                 </div>
             `).join('');
         }
 
-        function showDetail(index) {
-            const log = currentLogs[index];
-            const panel = document.getElementById('detail-panel');
-            const jsonView = document.getElementById('json-content');
-            const msgView = document.getElementById('msg-body-view');
-
-            panel.classList.remove('hidden');
-            jsonView.innerHTML = `<pre class="json-pre">${JSON.stringify(log.raw || log, null, 2)}</pre>`;
-            msgView.innerText = log.message_body || "N/A - System Event";
+        function showJSON(i) {
+            document.getElementById('detail-panel').classList.remove('hidden');
+            document.getElementById('json-content').innerText = JSON.stringify(logs[i].raw || logs[i], null, 2);
+            document.getElementById('json-timestamp').innerText = logs[i].timestamp || new Date().toLocaleTimeString();
         }
 
-        document.getElementById('triggerForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const phone = encodeURIComponent(document.getElementById('phone').value);
-            const msg = encodeURIComponent(document.getElementById('message').value);
-            await fetch(`/trigger/CreditUnion_Alpha?to_number=${phone}&message=${msg}`, {method: 'POST'});
-            fetchLogs();
-        };
-
-        setInterval(fetchLogs, 2000);
+        setInterval(updateLogs, 2000);
+        updateLogs();
     </script>
 </body>
 </html>
