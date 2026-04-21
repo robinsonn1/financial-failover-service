@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Twilio Failover Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .json-pre { background: #1e293b; color: #38bdf8; padding: 10px; border-radius: 5px; font-size: 0.75rem; overflow-x: auto; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white font-sans p-8 flex flex-col min-h-screen">
+    <div class="max-w-6xl mx-auto flex-grow w-full">
+        <header class="mb-10 border-b border-slate-700 pb-4 flex justify-between items-end">
+            <h1 class="text-3xl font-bold text-red-500">Twilio <span class="text-white text-xl font-light underline decoration-red-500">Failover Engine</span></h1>
+            <div id="connection-status" class="text-xs text-slate-400">Live Connection: Active</div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-xl">
+                <h2 class="text-xl font-semibold mb-4 flex items-center italic text-slate-300">Live Webhook Monitor</h2>
+                <div id="log-container" class="space-y-3 h-[500px] overflow-y-auto pr-2">
+                    <p class="text-slate-500">Waiting for triggers...</p>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-white text-slate-900 p-6 rounded-lg shadow-xl">
+                    <h2 class="text-xl font-bold mb-4">Trigger Alert</h2>
+                    <form id="triggerForm" class="space-y-4">
+                        <input type="text" id="phone" placeholder="Member Phone (+1...)" class="w-full p-2 border rounded">
+                        <textarea id="message" class="w-full p-2 border rounded h-20">Fraud Alert: Large transaction detected.</textarea>
+                        <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700 transition uppercase tracking-wider">Initiate Workflow</button>
+                    </form>
+                </div>
+
+                <div id="detail-panel" class="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-xl hidden">
+                    <h3 class="text-red-400 font-bold mb-2 uppercase text-xs tracking-widest">Payload Inspection</h3>
+                    <div id="json-content"></div>
+                    <div class="mt-4 p-3 bg-slate-900 rounded border border-slate-700">
+                        <p class="text-xs text-slate-500 uppercase font-bold">Message Content</p>
+                        <p id="msg-body-view" class="text-sm text-slate-300 italic"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-12 border-t border-slate-800 pt-6 pb-4 text-center text-slate-500 text-sm">
+        <p>Robinson Navarro | Demo 2026 Twilio - All Rights Reserved</p>
+    </footer>
+
+    <script>
+        let currentLogs = [];
+
+        async function fetchLogs() {
+            const res = await fetch('/api/logs');
+            const data = await res.json();
+            currentLogs = data;
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('log-container');
+            container.innerHTML = currentLogs.map((log, index) => `
+                <div onclick="showDetail(${index})" class="p-4 bg-slate-700 hover:bg-slate-600 cursor-pointer rounded border-l-4 transition-all duration-200 ${log.status === 'completed' ? 'border-green-500' : 'border-amber-500'}">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-slate-400 uppercase font-black">${log.event}</p>
+                        ${log.flag ? `<span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-600 text-white">${log.flag}</span>` : ''}
+                    </div>
+                    <p class="text-sm font-medium mt-1">${log.status || log.details}</p>
+                    <p class="text-[10px] text-slate-500 mt-2 italic text-right">Click to inspect JSON</p>
+                </div>
+            `).join('');
+        }
+
+        function showDetail(index) {
+            const log = currentLogs[index];
+            const panel = document.getElementById('detail-panel');
+            const jsonView = document.getElementById('json-content');
+            const msgView = document.getElementById('msg-body-view');
+
+            panel.classList.remove('hidden');
+            jsonView.innerHTML = `<pre class="json-pre">${JSON.stringify(log.raw || log, null, 2)}</pre>`;
+            msgView.innerText = log.message_body || "N/A - System Event";
+        }
+
+        document.getElementById('triggerForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const phone = encodeURIComponent(document.getElementById('phone').value);
+            const msg = encodeURIComponent(document.getElementById('message').value);
+            await fetch(`/trigger/CreditUnion_Alpha?to_number=${phone}&message=${msg}`, {method: 'POST'});
+            fetchLogs();
+        };
+
+        setInterval(fetchLogs, 2000);
+    </script>
+</body>
+</html>
